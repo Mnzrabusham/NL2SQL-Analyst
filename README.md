@@ -8,7 +8,7 @@ customers, products, orders, order items), and returns the generated SQL
 together with the result rows. The SQL is always part of the response,
 so results can be audited instead of trusted blindly.
 
-Built alongside [rag-doc-assistant](https://github.com/Mnzrabusham/rag-doc-assistant),
+Built alongside [RAG-Research-Assistant](https://github.com/Mnzrabusham/rag-research-assistant),
 with the same project structure.
 
 ## Architecture
