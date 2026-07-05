@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NL2SQL Analyst</title>
+<style>
+  :root{color-scheme:light;}
+  body{font-family:-apple-system,system-ui,sans-serif;max-width:860px;margin:40px auto;padding:0 20px;color:#1a1a1a;background:#fff;}
+  h1{font-size:20px;}
+  input[type=text]{width:70%;padding:8px;font-size:14px;}
+  button{padding:8px 14px;font-size:14px;cursor:pointer;}
+  pre{background:#f5f5f5;padding:12px;border-radius:6px;font-size:13px;overflow-x:auto;white-space:pre-wrap;}
+  details{margin-bottom:16px;}
+  summary{cursor:pointer;font-size:14px;color:#555;}
+  table{border-collapse:collapse;margin-top:12px;font-size:13px;width:100%;}
+  th,td{border:1px solid #ddd;padding:6px 10px;text-align:left;}
+  th{background:#f5f5f5;}
+  .error{margin-top:16px;padding:12px;background:#fdecea;border-radius:6px;color:#b3261e;}
+  .error pre{background:#fff;margin:8px 0 0;}
+  .note{font-size:12px;color:#b06000;margin-top:6px;}
+  .badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600;background:#fef7e0;color:#b06000;margin-left:8px;vertical-align:middle;}
+  #health{font-size:12px;}
+  #health.up{color:#137333;}
+  #health.down{color:#b3261e;}
+  small{color:#888;}
+  #sqlBlock h3, #resultBlock h3{font-size:14px;margin-bottom:4px;}
+</style>
+</head>
+<body>
+  <h1>NL2SQL Analyst</h1>
+  <p><small>Ask questions about a sample e-commerce database in plain English.
+     Points at a local FastAPI backend (default: http://localhost:8001).</small>
+     <span id="health">checking backend…</span></p>
+
+  <details>
+    <summary>Database schema (what the model sees)</summary>
+    <pre id="schema">loading…</pre>
+  </details>
+
+  <input type="text" id="question" placeholder="e.g. What are the top 3 products by revenue?">
+  <button onclick="ask()">Ask</button>
+
+  <div id="output"></div>
+
+<script>
+  // Same-origin when served by the backend itself; localhost fallback
+  // when this file is opened directly from disk.
+  const API_BASE = location.protocol.startsWith('http') ? location.origin : "http://localhost:8001";
+
+  // All model output (SQL, rows) is inserted via textContent — never
+  // innerHTML — because generated SQL and query results are untrusted.
+  function el(tag, className, text){
+    const node = document.createElement(tag);
+    if (className) node.className = className;
+    if (text !== undefined) node.textContent = text;
+    return node;
+  }
+
+  async function init(){
+    const health = document.getElementById('health');
+    try {
+      const res = await fetch(`${API_BASE}/health`);
+      health.textContent = res.ok ? 'backend: connected' : 'backend: error';
+      health.className = res.ok ? 'up' : 'down';
+      const schema = await (await fetch(`${API_BASE}/schema`)).json();
+      document.getElementById('schema').textContent = schema.schema_text;
+    } catch {
+      health.textContent = 'backend: unreachable — is uvicorn running on 8001?';
+      health.className = 'down';
+    }
+  }
+  init();
+
+  async function ask(){
+    const question = document.getElementById('question').value;
+    const output = document.getElementById('output');
+    output.replaceChildren(el('p', '', 'Thinking…'));
+
+    let res, data;
+    try {
+      res = await fetch(`${API_BASE}/ask`, {
+        method: 'POST', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({question})
+      });
+      data = await res.json();
+    } catch (e) {
+      output.replaceChildren(el('div', 'error', `Request failed: ${e.message}`));
+      return;
+    }
+    output.replaceChildren();
+
+    if (!res.ok) {
+      const detail = data.detail;
+      const box = el('div', 'error');
+      if (detail && typeof detail === 'object') {
+        box.appendChild(el('div', '', `Rejected: ${detail.reason}`));
+        if (detail.sql) box.appendChild(el('pre', '', detail.sql));
+      } else {
+        box.appendChild(el('div', '', `Error ${res.status}: ${detail}`));
+      }
+      output.appendChild(box);
+      return;
+    }
+
+    const sqlBlock = el('div', '', '');
+    sqlBlock.id = 'sqlBlock';
+    const sqlHeading = el('h3', '', 'Generated SQL');
+    if (data.repaired) {
+      sqlHeading.appendChild(el('span', 'badge', 'self-corrected'));
+    }
+    sqlBlock.appendChild(sqlHeading);
+    sqlBlock.appendChild(el('pre', '', data.sql));
+    output.appendChild(sqlBlock);
+
+    const resultBlock = el('div', '', '');
+    resultBlock.id = 'resultBlock';
+    resultBlock.appendChild(el('h3', '', `Results (${data.row_count} row${data.row_count === 1 ? '' : 's'})`));
+    if (data.truncated) {
+      resultBlock.appendChild(el('div', 'note', 'Results truncated at the server row cap.'));
+    }
+
+    const table = el('table');
+    const head = el('tr');
+    for (const col of data.columns) head.appendChild(el('th', '', col));
+    table.appendChild(head);
+    for (const row of data.rows) {
+      const tr = el('tr');
+      for (const cell of row) tr.appendChild(el('td', '', cell === null ? 'NULL' : String(cell)));
+      table.appendChild(tr);
+    }
+    resultBlock.appendChild(table);
+    output.appendChild(resultBlock);
+  }
+
+  document.getElementById('question').addEventListener('keydown', e => {
+    if (e.key === 'Enter') ask();
+  });
+</script>
+</body>
+</html>

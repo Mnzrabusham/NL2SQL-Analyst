@@ -1,0 +1,53 @@
+{
+  "description": "Questions with ground-truth SQL against the seeded sample DB. Execution accuracy compares result sets order-insensitively, since the model may choose a different (equally valid) ordering or column names.",
+  "items": [
+    {
+      "question": "How many customers are there?",
+      "ground_truth_sql": "SELECT COUNT(*) FROM customers"
+    },
+    {
+      "question": "How many products cost more than 100 dollars?",
+      "ground_truth_sql": "SELECT COUNT(*) FROM products WHERE unit_price > 100"
+    },
+    {
+      "question": "List the names of customers from Germany.",
+      "ground_truth_sql": "SELECT name FROM customers WHERE country = 'Germany'"
+    },
+    {
+      "question": "How many orders were placed in March 2026?",
+      "ground_truth_sql": "SELECT COUNT(*) FROM orders WHERE order_date LIKE '2026-03%'"
+    },
+    {
+      "question": "How many orders have been returned?",
+      "ground_truth_sql": "SELECT COUNT(*) FROM orders WHERE status = 'returned'"
+    },
+    {
+      "question": "What are the top 3 products by total revenue?",
+      "ground_truth_sql": "SELECT p.name, SUM(oi.quantity * oi.unit_price) AS revenue FROM order_items oi JOIN products p ON p.id = oi.product_id GROUP BY p.id, p.name ORDER BY revenue DESC LIMIT 3"
+    },
+    {
+      "question": "Which customer has placed the most orders?",
+      "ground_truth_sql": "SELECT c.name FROM customers c JOIN orders o ON o.customer_id = c.id GROUP BY c.id, c.name ORDER BY COUNT(*) DESC, c.name LIMIT 1"
+    },
+    {
+      "question": "What is the total revenue across all orders?",
+      "ground_truth_sql": "SELECT SUM(quantity * unit_price) FROM order_items"
+    },
+    {
+      "question": "What is the average unit price per product category?",
+      "ground_truth_sql": "SELECT category, AVG(unit_price) FROM products GROUP BY category"
+    },
+    {
+      "question": "How many distinct customers have placed at least one order?",
+      "ground_truth_sql": "SELECT COUNT(DISTINCT customer_id) FROM orders"
+    },
+    {
+      "question": "What is the revenue from orders with status shipped?",
+      "ground_truth_sql": "SELECT SUM(oi.quantity * oi.unit_price) FROM order_items oi JOIN orders o ON o.id = oi.order_id WHERE o.status = 'shipped'"
+    },
+    {
+      "question": "Which product category sold the most units?",
+      "ground_truth_sql": "SELECT p.category FROM order_items oi JOIN products p ON p.id = oi.product_id GROUP BY p.category ORDER BY SUM(oi.quantity) DESC LIMIT 1"
+    }
+  ]
+}
